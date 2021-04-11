@@ -3,11 +3,12 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
  ### apply gmail labels using google script
 
-[Ukko](https://en.wikipedia.org/wiki/Ukko) is a code name for a [google script](https://developers.google.com/apps-script) tool accessing gmail inbox threads, looping over them and assigning labels based on the email metadata. It's intended be setup via google drive and have time driven trigger.
+[Ukko](https://github.com/T0MASD/ukko/blob/main/modules/ukko.js) is a code name for a [google script](https://developers.google.com/apps-script) tool accessing gmail inbox threads, looping over them and assigning labels based on the email metadata. It's intended be setup via google drive and have time driven trigger.
+
 
 # Using on google drive
 1. Access your [google drive](https://en.wikipedia.org/wiki/Ukko), click **New** and select ["Google Apps Script"](https://script.google.com/create).
-2. Name the project "Ukko" and paste the contents of ukko.js, exclude `import` and `export` statements those are used for testing Ukko locally.
+2. Name the project "Ukko" and paste the contents of [ukko.js](https://github.com/T0MASD/ukko/blob/main/modules/ukko.js), exclude `import` and `export` statements those are used for testing Ukko locally.
 3. Click "Run" icon at the top of the editor, you will be prompted to grant access to your gmail.
 4. If there are any messages in your inbox that have header "List-Id" it will create and assign labels.
 
@@ -21,7 +22,7 @@
   - "lists/my-list/company" 
 - Labelled threads are shown at all nesting levels.
 
-**NOTE**: To automatically "archive" the thread after labels are applied, uncomment following line in ukko.js:
+**NOTE**: To automatically "archive" the thread after labels are applied, uncomment following line in [ukko.js](https://github.com/T0MASD/ukko/blob/main/modules/ukko.js):
 ```
 if (labels.length) { inboxThread.moveToArchive() }
 ```
