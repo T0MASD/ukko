@@ -17,8 +17,8 @@ const headers2 = {
 const message1 = new GmailMessage(headers1)
 const message2 = new GmailMessage(headers2)
 
-const inboxThread1 = new InboxThread([message1, message2])
-const inboxThread2 = new InboxThread([message1])
+const inboxThread1 = new InboxThread([message1])
+const inboxThread2 = new InboxThread([message1, message2])
 
 const gmailApp = new GmailApp([inboxThread1, inboxThread2])
 const logger = new Logger()
