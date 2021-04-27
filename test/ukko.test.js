@@ -14,9 +14,9 @@ describe('email filter tests', () => {
       expect(result).to.eql(expectResult)
     })
     it('should return username', () => {
-      const from = 'Github <noreply@github.com>'
+      const from = 'First Last <flast@example.com>'
       const result = getReMatch('username', from)
-      const expectResult = 'noreply'
+      const expectResult = 'flast'
       expect(result).to.eql(expectResult)
     })
     it('should return jira project', () => {
@@ -57,9 +57,9 @@ describe('email filter tests', () => {
       const expectResult = ['github']
       expect(result).to.eql(expectResult)
     })
-    it('should return list of labels for emails from errata@redhat.com', () => {
+    it('should return list of labels for emails from errata@security.com', () => {
       const headers = {
-        From: 'Red Hat Errata Notifications <errata@redhat.com>'
+        From: 'Errata <errata@security.com>'
       }
       const message = new GmailMessage(headers)
       const result = getLabels(message)
@@ -68,17 +68,17 @@ describe('email filter tests', () => {
     })
     it('should return list of labels for emails from team', () => {
       const headers = {
-        From: 'First Last <flast@redhat.com>'
+        From: 'First Last <flast@example.com>'
       }
       const message = new GmailMessage(headers)
       const result = getLabels(message)
       const expectResult = ['team/flast']
       expect(result).to.eql(expectResult)
     })
-    it('should return list of labels for emails from some@434324325214.amazon.com', () => {
+    it('should return list of labels for emails from some@subdomain.domain.com', () => {
       const headers = {
         From: 'some@subdomain.domain.com',
-        'List-Id': '<some.subdomain.amazon.com>'
+        'List-Id': '<some.subdomain.domain.com>'
       }
       const message = new GmailMessage(headers)
       const result = getLabels(message)
@@ -87,8 +87,7 @@ describe('email filter tests', () => {
     })
     it('should return list of labels for emails for jira', () => {
       const headers = {
-        From: 'issues@jboss.org',
-        Subject: '[Red Hat JIRA] Subscription: Filter for KC-STI'
+        From: 'issues@example.come'
       }
       const message = new GmailMessage(headers)
       const result = getLabels(message)
@@ -97,8 +96,8 @@ describe('email filter tests', () => {
     })
     it('should return list of labels for emails for jira project', () => {
       const headers = {
-        From: 'issues@jboss.org',
-        Subject: '[Red Hat JIRA] (proj-123)'
+        From: 'issues@example.come',
+        Subject: '[JIRA] (proj-123)'
       }
       const message = new GmailMessage(headers)
       const result = getLabels(message)
