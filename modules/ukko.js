@@ -94,14 +94,33 @@ function getLabels (message) {
   }
   // process jira
   if (messageFrom.includes('issues@')) {
+    let label = 'jira'
     // extract 'PROJ' from '...(PROJ-123)...'
     const jiraProj = getReMatch('jiraproj', messageSubject)
-    let label = 'jira'
     if (jiraProj) {
       label += `/${jiraProj}`
     }
     labels.push(label)
-    return labels
+  }
+  // process bugzilla
+  if (messageFrom.includes('bugzilla@')) {
+    let label = 'bz'
+    if (message.getHeader('X-Bugzilla-Product')) {
+      const bzProdHeader = message.getHeader('X-Bugzilla-Product')
+      let bzProd
+      if (bzProdHeader.split(' ').length > 1) {
+        // create acronym
+        bzProd = getReMatch('acronym', bzProdHeader)
+      } else {
+        bzProd = bzProdHeader
+      }
+      label += `/${bzProd}`
+      if (message.getHeader('X-Bugzilla-Component')) {
+        const bzComponent = message.getHeader('X-Bugzilla-Component')
+        label += `/${bzComponent}`
+      }
+    }
+    labels.push(label)
   }
   // process gitlab notifications
   if (message.getHeader('X-GitLab-Project')) {
@@ -141,6 +160,9 @@ function getReMatch (kind, myStr) {
     case 'listid':
       re = /<([^.]+).+>/i
       break
+    case 'acronym':
+      re = /\b(\w)/g
+      return myStr.match(re).join('')
   }
   if (myStr.match(re)) {
     return myStr.match(re).pop()

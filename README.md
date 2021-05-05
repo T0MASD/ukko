@@ -95,6 +95,9 @@ email filter tests
    ✓ should return list of labels for emails from some@subdomain.domain.com
    ✓ should return list of labels for emails for jira
    ✓ should return list of labels for emails for jira project
+   ✓ should return list of labels for emails for bugzilla
+   ✓ should return list of labels for emails for bugzilla project
+   ✓ should return list of labels for emails for bugzilla project acronym and component
  should return list of assigned labels
    ✓ output list of processed emails with labels applied
  run filter tests
@@ -103,7 +106,7 @@ from:email@example.com labels:lists/planet-list/example
    ✓ output list of processed emails with labels applied
 
 
-14 passing (20ms)
+17 passing (45ms)
 ```
 
 ## Run lint

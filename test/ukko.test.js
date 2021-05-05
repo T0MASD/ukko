@@ -104,6 +104,36 @@ describe('email filter tests', () => {
       const expectResult = ['jira/proj']
       expect(result).to.eql(expectResult)
     })
+    it('should return list of labels for emails for bugzilla', () => {
+      const headers = {
+        From: 'bugzilla@example.come'
+      }
+      const message = new GmailMessage(headers)
+      const result = getLabels(message)
+      const expectResult = ['bz']
+      expect(result).to.eql(expectResult)
+    })
+    it('should return list of labels for emails for bugzilla project', () => {
+      const headers = {
+        From: 'bugzilla@example.come',
+        'X-Bugzilla-Product': 'scalable'
+      }
+      const message = new GmailMessage(headers)
+      const result = getLabels(message)
+      const expectResult = ['bz/scalable']
+      expect(result).to.eql(expectResult)
+    })
+    it('should return list of labels for emails for bugzilla project acronym and component', () => {
+      const headers = {
+        From: 'bugzilla@example.come',
+        'X-Bugzilla-Product': 'scalable enterprise platform',
+        'X-Bugzilla-Component': 'component'
+      }
+      const message = new GmailMessage(headers)
+      const result = getLabels(message)
+      const expectResult = ['bz/sep/component']
+      expect(result).to.eql(expectResult)
+    })
   })
   describe('should return list of assigned labels', () => {
     it('output list of processed emails with labels applied', () => {
