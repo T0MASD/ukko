@@ -70,8 +70,10 @@ function getLabels (message) {
   const messageSubject = message.getSubject()
   const messageFrom = message.getFrom()
   // run regex match
-  const messageFromDomain = getReMatch('domain', messageFrom)
-  const messageFromUsername = getReMatch('username', messageFrom)
+  const messageEmail = getReMatch('email', messageFrom.trim())
+  const messageFromFQDN = messageEmail.split('@')[1]
+  const messageFromDomain = messageFromFQDN.split('.').reverse()[1]
+  const messageFromUsername = messageEmail.split('@')[0]
 
   // process @github.com
   if (messageFrom.includes('@github.com')) {
@@ -145,17 +147,11 @@ function getLabels (message) {
 function getReMatch (kind, myStr) {
   let re
   switch (kind) {
-    case 'domain':
-      re = /(?<=@)[^.]+(?=\.)/i
-      break
-    case 'username':
-      re = /<([^@]+)/i
-      break
     case 'jiraproj':
       re = /\((\w+[^-])-\d+\)/i
       break
     case 'email':
-      re = /<([^>]+)/i
+      re = /[^@<\s]+@[^@\s>]+/gi
       break
     case 'listid':
       re = /<([^.]+).+>/i

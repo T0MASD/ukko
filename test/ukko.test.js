@@ -7,16 +7,10 @@ import { GmailMessage } from '../modules/google-apps-script.js'
 
 describe('email filter tests', () => {
   describe('get regex tests', () => {
-    it('should return domain', () => {
+    it('should return email', () => {
       const from = 'Github <noreply@github.com>'
-      const result = getReMatch('domain', from)
-      const expectResult = 'github'
-      expect(result).to.eql(expectResult)
-    })
-    it('should return username', () => {
-      const from = 'First Last <flast@example.com>'
-      const result = getReMatch('username', from)
-      const expectResult = 'flast'
+      const result = getReMatch('email', from)
+      const expectResult = 'noreply@github.com'
       expect(result).to.eql(expectResult)
     })
     it('should return jira project', () => {
@@ -82,7 +76,7 @@ describe('email filter tests', () => {
       }
       const message = new GmailMessage(headers)
       const result = getLabels(message)
-      const expectResult = ['lists/some/subdomain']
+      const expectResult = ['lists/some/domain']
       expect(result).to.eql(expectResult)
     })
     it('should return list of labels for emails for jira', () => {
@@ -150,8 +144,8 @@ describe('email filter tests', () => {
     it('output list of processed emails with labels applied', () => {
       const result = runUkko()
       const expectResult = {
-        'announce-list@example.com': ['lists/announce-list/example'],
-        'email@example.com': ['lists/planet-list/example']
+        'Announce list <announce-list@example.com>': ['lists/announce-list/example'],
+        'email@subdomain.example.com': ['lists/planet-list/example']
       }
       expect(result).to.eql(expectResult)
     })
