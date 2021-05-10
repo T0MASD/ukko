@@ -6,11 +6,11 @@ import { runUkko } from './modules/ukko.js'
 
 // Setup data
 const headers1 = {
-  From: 'announce-list@example.com',
+  From: 'Announce list <announce-list@example.com>',
   'List-Id': 'Announce List <announce-list.example.com>'
 }
 const headers2 = {
-  From: 'email@example.com',
+  From: 'email@subdomain.example.com',
   'List-Id': 'Planet List <planet-list.example.com>'
 }
 
