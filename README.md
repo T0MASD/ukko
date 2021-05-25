@@ -98,6 +98,7 @@ email filter tests
    ✓ should return list of labels for emails for bugzilla
    ✓ should return list of labels for emails for bugzilla project
    ✓ should return list of labels for emails for bugzilla project acronym and component
+   ✓ should not break with empty headers
  should return list of assigned labels
    ✓ output list of processed emails with labels applied
  run filter tests
