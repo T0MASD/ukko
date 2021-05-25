@@ -35,8 +35,8 @@ describe('email filter tests', () => {
   describe('get labels tests', () => {
     it('should return list of labels for header named List-Id', () => {
       const headers = {
-        'List-Id': 'Some List <somelist.example.com>',
-        'From': 'noreply@example.com'
+        From: 'noreply@example.com',
+        'List-Id': 'Some List <somelist.example.com>'
       }
       const message = new GmailMessage(headers)
       const result = getLabels(message)
