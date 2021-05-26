@@ -8,11 +8,11 @@ class GmailMessage {
   }
 
   getFrom () {
-    return this.getHeader('From') ? this.getHeader('From') : 'noemail@example.com'
+    return this.getHeader('From')
   }
 
   getSubject () {
-    return this.getHeader('Subject') ? this.getHeader('Subject') : ''
+    return this.getHeader('Subject')
   }
 
   getThread () {

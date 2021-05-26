@@ -35,6 +35,7 @@ describe('email filter tests', () => {
   describe('get labels tests', () => {
     it('should return list of labels for header named List-Id', () => {
       const headers = {
+        From: 'noreply@example.com',
         'List-Id': 'Some List <somelist.example.com>'
       }
       const message = new GmailMessage(headers)
@@ -128,10 +129,18 @@ describe('email filter tests', () => {
       const expectResult = ['bz/sep/component']
       expect(result).to.eql(expectResult)
     })
+    it('should not break with empty headers', () => {
+      const headers = {}
+      const message = new GmailMessage(headers)
+      const result = getLabels(message)
+      const expectResult = []
+      expect(result).to.eql(expectResult)
+    })
   })
   describe('should return list of assigned labels', () => {
     it('output list of processed emails with labels applied', () => {
       const headers = {
+        From: 'bla@example.com',
         'List-Id': 'Some List <somelist.example.com>'
       }
       const message = new GmailMessage(headers)

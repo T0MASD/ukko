@@ -67,13 +67,16 @@ function assignLabels (message) {
 function getLabels (message) {
   const labels = []
   const teamArr = ['flast']
-  const messageSubject = message.getSubject()
-  const messageFrom = message.getFrom()
+  const messageSubject = message.getSubject() ? message.getSubject() : ''
+  const messageFrom = message.getFrom() ? message.getFrom() : ''
   // run regex match
   const messageEmail = getReMatch('email', messageFrom.trim())
-  const messageFromFQDN = messageEmail.split('@')[1]
-  const messageFromDomain = messageFromFQDN.split('.').reverse()[1]
-  const messageFromUsername = messageEmail.split('@')[0]
+  let messageFromFQDN = ''; let messageFromDomain = ''; let messageFromUsername = ''
+  if (messageEmail && messageEmail.includes('@') && messageEmail.includes('.')) {
+    messageFromFQDN = messageEmail.split('@')[1]
+    messageFromDomain = messageFromFQDN.split('.').reverse()[1]
+    messageFromUsername = messageEmail.split('@')[0]
+  }
 
   // process @github.com
   if (messageFrom.includes('@github.com')) {
