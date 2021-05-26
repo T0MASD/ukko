@@ -31,6 +31,12 @@ describe('email filter tests', () => {
       const expectResult = 'somelist'
       expect(result).to.eql(expectResult)
     })
+    it('should return to name', () => {
+      const to = '"Some List" <somelist.example.com>'
+      const result = getReMatch('to', to)
+      const expectResult = 'Some List'
+      expect(result).to.eql(expectResult)
+    })
   })
   describe('get labels tests', () => {
     it('should return list of labels for header named List-Id', () => {
@@ -50,6 +56,16 @@ describe('email filter tests', () => {
       const message = new GmailMessage(headers)
       const result = getLabels(message)
       const expectResult = ['github']
+      expect(result).to.eql(expectResult)
+    })
+    it('should sublabel @github.com when "To" header is set', () => {
+      const headers = {
+        From: 'Github <noreply@github.com>',
+        To: '"My PROJ" <proj@gh.com>'
+      }
+      const message = new GmailMessage(headers)
+      const result = getLabels(message)
+      const expectResult = ['github/My PROJ']
       expect(result).to.eql(expectResult)
     })
     it('should return list of labels for emails from errata@security.com', () => {
