@@ -80,7 +80,16 @@ function getLabels (message) {
 
   // process @github.com
   if (messageFrom.includes('@github.com')) {
-    labels.push('github')
+    let label = 'github'
+    const toValue = message.getHeader('To')
+    if (toValue) {
+      // extract 'PROJ' from '"PROJ" <proj@gh.com>'
+      const ghProj = getReMatch('to', toValue)
+      if (ghProj) {
+        label += `/${ghProj}`
+      }
+    }
+    labels.push(label)
   }
   if (messageFrom.includes('@docs.google.com')) {
     labels.push('gdrive')
@@ -158,6 +167,9 @@ function getReMatch (kind, myStr) {
       break
     case 'listid':
       re = /<([^.]+).+>/i
+      break
+    case 'to':
+      re = /"(.*?)"/i
       break
     case 'acronym':
       re = /\b(\w)/g

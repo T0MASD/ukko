@@ -82,14 +82,15 @@ from:email@example.com labels:lists/planet-list/example
 
 email filter tests
  get regex tests
-   ✓ should return domain
-   ✓ should return username
+   ✓ should return email
    ✓ should return jira project
    ✓ should return email
    ✓ should return list id
+   ✓ should return to name
  get labels tests
    ✓ should return list of labels for header named List-Id
    ✓ should return list of labels for emails from @github.com
+   ✓ should sublabel @github.com when "To" header is set
    ✓ should return list of labels for emails from errata@security.com
    ✓ should return list of labels for emails from team
    ✓ should return list of labels for emails from some@subdomain.domain.com
@@ -102,12 +103,10 @@ email filter tests
  should return list of assigned labels
    ✓ output list of processed emails with labels applied
  run filter tests
-from:announce-list@example.com labels:lists/announce-list/example
-from:email@example.com labels:lists/planet-list/example
    ✓ output list of processed emails with labels applied
 
 
-17 passing (45ms)
+19 passing (17ms)
 ```
 
 ## Run lint
