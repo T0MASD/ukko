@@ -24,14 +24,14 @@
 3. Click "Run" icon at the top of the editor, you will be prompted to grant access to your gmail.
 4. If there are any messages in your inbox that have header "List-Id" it will create and assign labels.
 
-**NOTE**: 
+**NOTE**:
 - Missing labels are created automatically.
 - Feel free to delete labels in gmail at any time, they won't be recreated until matching email is processed by Ukko.
 - Labels separated by "/" are nested.
 - Threads are assigned all labels in the nested chain, for label "lists/my-list/company", following are assigned:
   - "lists"
   - "lists/my-list"
-  - "lists/my-list/company" 
+  - "lists/my-list/company"
 - Labelled threads are shown at all nesting levels.
 
 **NOTE**: To automatically "archive" the thread after labels are applied, uncomment following line in [modules/ukko.js](https://github.com/T0MASD/ukko/blob/main/modules/ukko.js) :
@@ -119,46 +119,65 @@ Eslint is used for linting all js code, if you have installed [eslint](https://e
 ```
 
 ## Run Ukko
-To Ukko locally with mock data call `node .` or `npm start`
+To run Ukko locally with mock data call `node app.js` or `npm start`
 ```shell
 [tomas@dev ukko]$ npm start
 
 > ukko@0.0.1 start /ukko
-> node .
+> node app.js
 
-from:email@example.com labels:lists/planet-list
-from:announce-list@example.com labels:lists/announce-list
+from:Announce list <announce-list@example.com> labels:lists/announce-list/example
+from:email@subdomain.example.com labels:lists/planet-list/example
 ```
 
 ## Extending label rules
-Modify `getLabels` function of [modules/ukko.js](https://github.com/T0MASD/ukko/blob/main/modules/ukko.js) to add your own logic for setting up labels. Few example rules are included with ukko, feel free to change to suit your needs.
+Ukko uses a config-driven rules engine. To add or modify label rules, edit the `RULES` array in [modules/ukko.js](https://github.com/T0MASD/ukko/blob/main/modules/ukko.js).
 
-Create "catch all" filters for given domain:
+### Rule fields
+
+| Field | Description |
+|-------|-------------|
+| `header` | Email header name to check (`From`, `Sender`, `To`, `List-Id`, `X-GitLab-Project`, etc.) |
+| `contains` | Substring match against header value |
+| `endswith` | Suffix match against header value |
+| `label` | Static label to assign (or base label for handlers) |
+| `handler` | Name of handler function for dynamic sublabeling |
+| `fallback` | Only apply if no labels matched yet (default: `false`) |
+
+### Adding a simple rule
+Match emails from a domain and assign a static label:
 ```javascript
-// process @github.com
-if (messageFrom.includes('@github.com')) {
- labels.push('github')
+{ header: 'From', contains: '@github.com', label: 'github' }
+```
+
+### Adding a rule with a handler
+Handlers receive `(message, baseLabel)` and return an array of labels. They can extract dynamic sublabels from other headers:
+```javascript
+// Rule config
+{ header: 'From', contains: '@github.com', label: 'github', handler: 'github' }
+
+// Handler in HANDLERS object
+github: function (message, baseLabel) {
+  let label = baseLabel
+  const toValue = message.getHeader('To')
+  if (toValue) {
+    const ghProj = getReMatch('to', toValue)
+    if (ghProj) { label += `/${ghProj}` }
+  }
+  return [label]
 }
 ```
-Here's an sample to extract GitLab project name from header named `X-GitLab-Project` and assign label `gitlab/projectname`:
+
+### Adding a fallback rule
+Fallback rules only fire when no other rules have matched:
 ```javascript
-// process gitlab notifications
-if (message.getHeader('X-GitLab-Project')) {
- labels.push(`gitlab/${message.getHeader('X-GitLab-Project')}`)
-}
+{ header: 'List-Id', label: 'lists', handler: 'mailing_list', fallback: true }
 ```
-Here's a sample to assign label from the value of `List-Id` header, in this example extra label is added where sender domain doesn't match `mydomain`:
+
+### Adding a handler-only rule (no pattern)
+Rules with a handler but no `contains`/`endswith` always run when the header exists:
 ```javascript
-// process mailing lists
-if (message.getHeader('List-Id')) {
- // extract my-list from 'My List <my-list.example.com>'
- const listIDshort = getReMatch('listid', message.getHeader('List-Id'))
- let listLabel = 'lists/' + listIDshort
- if (messageFromDomain !== 'mydomain') {
-   listLabel += `/${messageFromDomain}`
- }
- labels.push(listLabel)
-}
+{ header: 'X-GitLab-Project', label: 'gitlab', handler: 'gitlab_project' }
 ```
 ## Contributions
 

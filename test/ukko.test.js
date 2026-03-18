@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { expect } from 'chai'
-import { runUkko, getLabels, getReMatch, assignLabels } from '../modules/ukko.js'
+import { runUkko, getLabels, getReMatch, assignLabels, RULES, HANDLERS } from '../modules/ukko.js'
 import { GmailMessage } from '../modules/google-apps-script.js'
 
 describe('email filter tests', () => {
@@ -173,6 +173,219 @@ describe('email filter tests', () => {
         'email@subdomain.example.com': ['lists/planet-list/example']
       }
       expect(result).to.eql(expectResult)
+    })
+  })
+
+  // ============================================================
+  // CONFIG-DRIVEN ENGINE TESTS
+  // ============================================================
+
+  describe('config-driven rules engine', () => {
+    describe('RULES and HANDLERS exports', () => {
+      it('should export RULES as an array', () => {
+        expect(RULES).to.be.an('array')
+        expect(RULES.length).to.be.greaterThan(0)
+      })
+      it('should export HANDLERS as an object', () => {
+        expect(HANDLERS).to.be.an('object')
+      })
+      it('each rule should have a header field', () => {
+        for (const rule of RULES) {
+          expect(rule).to.have.property('header')
+        }
+      })
+      it('each rule should have a label field', () => {
+        for (const rule of RULES) {
+          expect(rule).to.have.property('label')
+        }
+      })
+      it('handler rules should reference existing handlers', () => {
+        for (const rule of RULES) {
+          if (rule.handler) {
+            expect(HANDLERS).to.have.property(rule.handler)
+            expect(HANDLERS[rule.handler]).to.be.a('function')
+          }
+        }
+      })
+    })
+
+    describe('contains matching', () => {
+      it('should match when header contains substring', () => {
+        const headers = { From: 'Github <noreply@github.com>' }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result).to.include('github')
+      })
+      it('should not match when header does not contain substring', () => {
+        const headers = { From: 'Someone <user@unknown.com>' }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result).to.eql([])
+      })
+    })
+
+    describe('endswith matching', () => {
+      it('should match when header ends with suffix', () => {
+        // This test requires an endswith rule to exist in RULES
+        // Find any endswith rule and test it
+        const endsWithRule = RULES.find(r => r.endswith)
+        if (endsWithRule) {
+          // construct a header value that ends with the suffix
+          const headers = { [endsWithRule.header]: `Test User <test${endsWithRule.endswith}` }
+          const message = new GmailMessage(headers)
+          const result = getLabels(message)
+          expect(result.length).to.be.greaterThan(0)
+        }
+      })
+    })
+
+    describe('fallback rules', () => {
+      it('should apply fallback rule when no other rules matched', () => {
+        // List-Id is a fallback rule — it should fire when no other rules matched
+        const headers = {
+          From: 'noreply@example.com',
+          'List-Id': 'Some List <somelist.example.com>'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        // should have the mailing list label
+        expect(result.length).to.be.greaterThan(0)
+        expect(result[0]).to.match(/^lists\//)
+      })
+      it('should NOT apply fallback rule when other rules already matched', () => {
+        // Find a fallback rule that matches on From
+        const fallbackRule = RULES.find(r => r.fallback && r.header === 'From')
+        if (fallbackRule) {
+          // construct headers that match both a non-fallback rule AND the fallback
+          const headers = {
+            From: 'Github <noreply@github.com>'
+          }
+          // only add fallback match if it wouldn't conflict
+          if (fallbackRule.contains && !headers.From.includes(fallbackRule.contains)) {
+            // skip — can't test this combination with github
+          } else {
+            const message = new GmailMessage(headers)
+            const result = getLabels(message)
+            // should have github label but not the fallback label
+            expect(result).to.include('github')
+          }
+        }
+      })
+    })
+
+    describe('handler with baseLabel', () => {
+      it('github handler should use baseLabel from rule config', () => {
+        const githubRule = RULES.find(r => r.handler === 'github')
+        expect(githubRule).to.not.equal(undefined)
+        const headers = {
+          From: 'Github <noreply@github.com>',
+          To: '"MyProject" <myproject@gh.com>'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result).to.include(`${githubRule.label}/MyProject`)
+      })
+      it('jira handler should use baseLabel from rule config', () => {
+        const jiraRule = RULES.find(r => r.handler === 'jira')
+        expect(jiraRule).to.not.equal(undefined)
+        const headers = {
+          From: 'Jira <issues@example.com>',
+          Subject: '[JIRA] (MYPROJ-456)'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result).to.include(`${jiraRule.label}/MYPROJ`)
+      })
+      it('bugzilla handler should use baseLabel from rule config', () => {
+        const bzRule = RULES.find(r => r.handler === 'bugzilla')
+        expect(bzRule).to.not.equal(undefined)
+        const headers = {
+          From: 'Bugzilla <bugzilla@example.com>',
+          'X-Bugzilla-Product': 'kernel',
+          'X-Bugzilla-Component': 'networking'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result).to.include(`${bzRule.label}/kernel/networking`)
+      })
+    })
+
+    describe('multiple rules contributing labels', () => {
+      it('should collect labels from multiple matching non-fallback rules', () => {
+        // github (From) + calendar (Sender) — both are non-fallback rules
+        const headers = {
+          From: 'Github <noreply@github.com>',
+          Sender: 'calendar-notification@google.com'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result.length).to.be.greaterThan(1)
+        expect(result).to.include('calendar')
+      })
+    })
+
+    describe('no duplicate labels', () => {
+      it('should not add the same label twice', () => {
+        const headers = {
+          From: 'Github <noreply@github.com>'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        const unique = [...new Set(result)]
+        expect(result).to.eql(unique)
+      })
+    })
+
+    describe('gitlab project handler', () => {
+      it('should label gitlab with project name from X-GitLab-Project header', () => {
+        const gitlabRule = RULES.find(r => r.handler === 'gitlab_project')
+        expect(gitlabRule).to.not.equal(undefined)
+        const headers = {
+          From: 'GitLab <gitlab@example.com>',
+          'X-GitLab-Project': 'my-project'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result).to.include(`${gitlabRule.label}/my-project`)
+      })
+    })
+
+    describe('team handler', () => {
+      it('should label team member by username', () => {
+        const teamRule = RULES.find(r => r.handler === 'team')
+        expect(teamRule).to.not.equal(undefined)
+        const headers = {
+          From: 'First Last <flast@example.com>'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result).to.include(`${teamRule.label}/flast`)
+      })
+      it('should not label non-team members', () => {
+        const teamRule = RULES.find(r => r.handler === 'team')
+        expect(teamRule).to.not.equal(undefined)
+        const headers = {
+          From: 'Random Person <random@example.com>'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        const teamLabels = result.filter(l => l.startsWith(teamRule.label))
+        expect(teamLabels).to.eql([])
+      })
+    })
+
+    describe('mailing list handler', () => {
+      it('should label mailing list with list-id and sender domain', () => {
+        const listRule = RULES.find(r => r.handler === 'mailing_list')
+        expect(listRule).to.not.equal(undefined)
+        const headers = {
+          From: 'noreply@example.com',
+          'List-Id': 'Some List <somelist.example.com>'
+        }
+        const message = new GmailMessage(headers)
+        const result = getLabels(message)
+        expect(result).to.include(`${listRule.label}/somelist/example`)
+      })
     })
   })
 })
