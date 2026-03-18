@@ -6,7 +6,7 @@
   "main": "app.js",
   "scripts": {
     "test": "mocha",
-    "start": "node .",
+    "start": "node app.js",
     "lint": "eslint ."
   },
   "repository": {

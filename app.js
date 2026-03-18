@@ -25,4 +25,9 @@ const logger = new Logger()
 
 export { gmailApp as GmailApp, logger as Logger }
 
-runUkko()
+// run when executed directly: node app.js
+// skip when imported by test runner (mocha, etc.)
+const entryArg = process.argv[1] || ''
+if (entryArg.endsWith('app.js')) {
+  runUkko()
+}

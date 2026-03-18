@@ -14,6 +14,131 @@ import { GmailApp, Logger } from '../app.js'
 //
 // https://github.com/T0MASD/ukko#readme
 
+// ============================================================
+// RULES CONFIG
+// ============================================================
+// Each rule checks a message header against a pattern.
+//
+// Fields:
+//   header   - email header name (From, Sender, To, List-Id, X-GitLab-Project, etc.)
+//   contains - substring match against header value
+//   endswith - suffix match against header value
+//   label    - static label to assign (or base label for handlers)
+//   handler  - name of handler function for dynamic sublabeling
+//   fallback - only apply if no labels matched yet (default: false)
+//
+// Rules are evaluated in order. Multiple rules can contribute labels.
+// Fallback rules only fire when no labels have been assigned yet.
+// ============================================================
+
+const RULES = [
+  // --- dev: development tools and notifications ---
+  { header: 'From', contains: '@github.com', label: 'github', handler: 'github' },
+  { header: 'From', contains: '@docs.google.com', label: 'gdrive' },
+  { header: 'Sender', contains: 'calendar-notification@google.com', label: 'calendar' },
+  { header: 'From', contains: 'errata@', label: 'errata' },
+  { header: 'From', contains: 'issues@', label: 'jira', handler: 'jira' },
+  { header: 'From', contains: 'bugzilla@', label: 'bz', handler: 'bugzilla' },
+
+  // --- username match (team members) ---
+  { header: 'From', label: 'team', handler: 'team' },
+
+  // --- header-exists rules ---
+  { header: 'X-GitLab-Project', label: 'gitlab', handler: 'gitlab_project' },
+
+  // --- List-Id rules (fallback — only if nothing else matched) ---
+  { header: 'List-Id', label: 'lists', handler: 'mailing_list', fallback: true }
+]
+
+// team members for username matching
+const TEAM = ['flast']
+
+// ============================================================
+// HANDLERS append dynamic sublabels to the base label from config
+// Each handler receives (message, baseLabel) and returns [label] or []
+// ============================================================
+
+const HANDLERS = {
+  // appends github project from To header: github/{project}
+  github: function (message, baseLabel) {
+    let label = baseLabel
+    const toValue = message.getHeader('To')
+    if (toValue) {
+      const ghProj = getReMatch('to', toValue)
+      if (ghProj) { label += `/${ghProj}` }
+    }
+    return [label]
+  },
+
+  // appends jira project from subject: jira/{PROJECT}
+  jira: function (message, baseLabel) {
+    let label = baseLabel
+    const subject = message.getHeader('Subject') || ''
+    const jiraProj = getReMatch('jiraproj', subject)
+    if (jiraProj) { label += `/${jiraProj}` }
+    return [label]
+  },
+
+  // appends bugzilla product/component: bz/{product}/{component}
+  bugzilla: function (message, baseLabel) {
+    let label = baseLabel
+    const bzProdHeader = message.getHeader('X-Bugzilla-Product')
+    if (bzProdHeader) {
+      let bzProd
+      if (bzProdHeader.split(' ').length > 1) {
+        bzProd = getReMatch('acronym', bzProdHeader)
+      } else {
+        bzProd = bzProdHeader
+      }
+      label += `/${bzProd}`
+      const bzComponent = message.getHeader('X-Bugzilla-Component')
+      if (bzComponent) { label += `/${bzComponent}` }
+    }
+    return [label]
+  },
+
+  // appends team member username: team/{username}
+  team: function (message, baseLabel) {
+    const from = message.getHeader('From') || ''
+    const email = getReMatch('email', from.trim())
+    if (email && email.includes('@')) {
+      const username = email.split('@')[0]
+      if (TEAM.includes(username)) {
+        return [`${baseLabel}/${username}`]
+      }
+    }
+    return []
+  },
+
+  // appends gitlab project name: gitlab/{project}
+  gitlab_project: function (message, baseLabel) {
+    return [`${baseLabel}/${message.getHeader('X-GitLab-Project')}`]
+  },
+
+  // appends list-id and sender domain: lists/{list-id}/{domain}
+  mailing_list: function (message, baseLabel) {
+    const from = message.getHeader('From') || ''
+    const email = getReMatch('email', from.trim())
+    let messageFromDomain = ''
+    if (email && email.includes('@')) {
+      const fqdn = email.split('@')[1]
+      if (fqdn && fqdn.includes('.') && fqdn.split('.').length >= 2) {
+        messageFromDomain = fqdn.split('.').reverse()[1]
+      }
+    }
+    const listIDshort = getReMatch('listid', message.getHeader('List-Id'))
+    let label = baseLabel + '/' + listIDshort
+    if (messageFromDomain !== 'mydomain') {
+      label += `/${messageFromDomain}`
+    }
+    return [label]
+  }
+}
+
+// ============================================================
+// CORE ENGINE
+// ============================================================
+
 // loop over inboxThreads and process
 function runUkko () {
   const result = {}
@@ -37,7 +162,7 @@ function runUkko () {
 function getLastMessage (inboxThread) {
   // load inboxThread messages
   const messages = inboxThread.getMessages()
-  // get last message from the hread
+  // get last message from the thread
   return messages[messages.length - 1]
 }
 
@@ -64,98 +189,45 @@ function assignLabels (message) {
   return labels
 }
 
+// evaluate rules config against message headers
 function getLabels (message) {
   const labels = []
-  const teamArr = ['flast']
-  const messageSubject = message.getSubject() ? message.getSubject() : ''
-  const messageFrom = message.getFrom() ? message.getFrom() : ''
-  // run regex match
-  const messageEmail = getReMatch('email', messageFrom.trim())
-  let messageFromFQDN = ''; let messageFromDomain = ''; let messageFromUsername = ''
-  if (messageEmail && messageEmail.includes('@') && messageEmail.includes('.')) {
-    messageFromFQDN = messageEmail.split('@')[1]
-    messageFromDomain = messageFromFQDN.split('.').reverse()[1]
-    messageFromUsername = messageEmail.split('@')[0]
+
+  for (const rule of RULES) {
+    // skip fallback rules if we already have labels
+    if (rule.fallback && labels.length) { continue }
+
+    // get header value
+    const headerValue = message.getHeader(rule.header)
+    if (!headerValue) { continue }
+
+    // check match
+    let matched = false
+    if (rule.contains) {
+      matched = headerValue.includes(rule.contains)
+    } else if (rule.endswith) {
+      matched = headerValue.endsWith(rule.endswith)
+    } else if (rule.handler) {
+      // handler-only rule (no pattern, e.g. team) — always runs if header exists
+      matched = true
+    }
+
+    if (matched) {
+      if (rule.handler && HANDLERS[rule.handler]) {
+        const handlerLabels = HANDLERS[rule.handler](message, rule.label)
+        for (const l of handlerLabels) {
+          if (!labels.includes(l)) { labels.push(l) }
+        }
+      } else if (rule.label) {
+        if (!labels.includes(rule.label)) { labels.push(rule.label) }
+      }
+    }
   }
 
-  // process @github.com
-  if (messageFrom.includes('@github.com')) {
-    let label = 'github'
-    const toValue = message.getHeader('To')
-    if (toValue) {
-      // extract 'PROJ' from '"PROJ" <proj@gh.com>'
-      const ghProj = getReMatch('to', toValue)
-      if (ghProj) {
-        label += `/${ghProj}`
-      }
-    }
-    labels.push(label)
-  }
-  if (messageFrom.includes('@docs.google.com')) {
-    labels.push('gdrive')
-  }
-  // calendar
-  if (message.getHeader('Sender') && message.getHeader('Sender').includes('calendar-notification@google.com')) {
-    labels.push('calendar')
-  }
-  // process errata@domain.com
-  if (messageFrom.includes('errata@')) {
-    labels.push('errata')
-  }
-  // process team
-  if (teamArr.includes(messageFromUsername)) {
-    labels.push(`team/${messageFromUsername}`)
-  }
-  // process jira
-  if (messageFrom.includes('issues@')) {
-    let label = 'jira'
-    // extract 'PROJ' from '...(PROJ-123)...'
-    const jiraProj = getReMatch('jiraproj', messageSubject)
-    if (jiraProj) {
-      label += `/${jiraProj}`
-    }
-    labels.push(label)
-  }
-  // process bugzilla
-  if (messageFrom.includes('bugzilla@')) {
-    let label = 'bz'
-    if (message.getHeader('X-Bugzilla-Product')) {
-      const bzProdHeader = message.getHeader('X-Bugzilla-Product')
-      let bzProd
-      if (bzProdHeader.split(' ').length > 1) {
-        // create acronym
-        bzProd = getReMatch('acronym', bzProdHeader)
-      } else {
-        bzProd = bzProdHeader
-      }
-      label += `/${bzProd}`
-      if (message.getHeader('X-Bugzilla-Component')) {
-        const bzComponent = message.getHeader('X-Bugzilla-Component')
-        label += `/${bzComponent}`
-      }
-    }
-    labels.push(label)
-  }
-  // process gitlab notifications
-  if (message.getHeader('X-GitLab-Project')) {
-    labels.push(`gitlab/${message.getHeader('X-GitLab-Project')}`)
-    // don't want process mailing lists after gitlab
-    return labels
-  }
-  // process mailing lists
-  if (message.getHeader('List-Id')) {
-    // extract my-list from 'My List <my-list.example.com>'
-    const listIDshort = getReMatch('listid', message.getHeader('List-Id'))
-    let listLabel = 'lists/' + listIDshort
-    if (messageFromDomain !== 'mydomain') {
-      listLabel += `/${messageFromDomain}`
-    }
-    labels.push(listLabel)
-  }
-  // end
   return labels
 }
 
+// regex helper
 function getReMatch (kind, myStr) {
   let re
   switch (kind) {
@@ -185,4 +257,4 @@ function getReMatch (kind, myStr) {
 // line below used for testing ukko locally
 // when running on google script engine
 // EXCLUDE LINE BELOW
-export { runUkko, getLabels, getReMatch, assignLabels }
+export { runUkko, getLabels, getReMatch, assignLabels, RULES, HANDLERS }
